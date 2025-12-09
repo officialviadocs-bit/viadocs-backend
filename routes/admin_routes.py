@@ -1,0 +1,322 @@
+from flask import Blueprint, jsonify, request, current_app
+from datetime import datetime, timedelta
+from bson import ObjectId
+import traceback
+
+admin_bp = Blueprint("admin_bp", __name__)
+
+# ================================================================
+# 🧠 ADMIN DASHBOARD — STABLE VERSION
+# ================================================================
+@admin_bp.route("/dashboard", methods=["GET"])
+def get_admin_dashboard():
+    try:
+        db = current_app.db
+        if db is None:
+            print("❌ Database not connected.")
+            return jsonify({"error": "Database connection failed"}), 500
+
+        users_col = db["users"]
+        docs_col = db["documents"]
+
+        # --- Query Parameters ---
+        referral_filter = request.args.get("referral", "overall").upper()
+        period = request.args.get("period", "daily").lower()
+        user_type = request.args.get("user_type", "student").lower()
+
+        # --- Build user query (supporting overview) ---
+        if user_type == "overview":
+            query = {} if referral_filter == "OVERALL" else {"referred_by": referral_filter}
+        else:
+            query = (
+                {"role": user_type}
+                if referral_filter == "OVERALL"
+                else {"referred_by": referral_filter, "role": user_type}
+            )
+
+        print(f"[INFO] Admin dashboard query: {query}")
+
+        # --- Fetch Users ---
+        users = list(users_col.find(query, limit=50))  # limit fetch for performance
+        total_users = len(users)
+
+        # ==============================
+        # 1️⃣ Referral Graph (DOC1...DOC10)
+        # ==============================
+        referrals = [f"DOC{i}" for i in range(1, 11)]
+        graph_data = []
+
+        for ref in referrals:
+            if user_type == "overview":
+                ref_query = {"referred_by": ref}
+            else:
+                ref_query = {"referred_by": ref, "role": user_type}
+
+            try:
+                count = users_col.count_documents(ref_query)
+            except Exception:
+                count = 0
+            graph_data.append({"referral": ref, "users": count})
+
+        # ==============================
+        # 2️⃣ Registration Trend Graph (daily/weekly/monthly)
+        # ==============================
+        now = datetime.utcnow()
+        trend_data = []
+
+        def count_in_range(start, end):
+            trend_query = {"createdAt": {"$gte": start, "$lt": end}}
+            if user_type != "overview":
+                trend_query["role"] = user_type
+            try:
+                return users_col.count_documents(trend_query)
+            except Exception:
+                return 0
+
+        if period == "daily":
+            for i in range(6, -1, -1):
+                day = now - timedelta(days=i)
+                start = datetime(day.year, day.month, day.day)
+                end = start + timedelta(days=1)
+                trend_data.append({
+                    "label": start.strftime("%d %b"),
+                    "count": count_in_range(start, end)
+                })
+        elif period == "weekly":
+            for i in range(3, -1, -1):
+                week_start = now - timedelta(weeks=i + 1)
+                week_end = now - timedelta(weeks=i)
+                trend_data.append({
+                    "label": f"Week {4 - i}",
+                    "count": count_in_range(week_start, week_end)
+                })
+        elif period == "monthly":
+            for i in range(5, -1, -1):
+                month = (now.month - i - 1) % 12 + 1
+                year = now.year - ((now.month - i - 1) // 12)
+                start = datetime(year, month, 1)
+                next_month = datetime(year + (1 if month == 12 else 0), (month % 12) + 1, 1)
+                trend_data.append({
+                    "label": start.strftime("%b %Y"),
+                    "count": count_in_range(start, next_month)
+                })
+
+        # ==============================
+        # 3️⃣ Recent Users Section
+        # ==============================
+        recent_users = []
+        for user in users[:10]:
+            user_id = str(user.get("_id", ""))
+            name = (f"{user.get('first_name', '')} {user.get('last_name', '')}").strip() or user.get("name", "Unknown")
+            doc_count = docs_col.count_documents({"user_id": user_id})
+            created_at = user.get("createdAt")
+
+            created_str = (
+                created_at.strftime("%d-%m-%Y %H:%M:%S")
+                if isinstance(created_at, datetime)
+                else "N/A"
+            )
+
+            recent_users.append({
+                "name": name,
+                "username": user.get("username", ""),
+                "mail": user.get("email", ""),
+                "docs": doc_count,
+                "register_date": created_str,
+                "referral": user.get("referred_by", "None"),
+                "role": user.get("role", user_type.capitalize())
+            })
+
+        # ✅ Final Response
+        return jsonify({
+            "total_users": total_users,
+            "recent_users": recent_users,
+            "graph_data": graph_data,
+            "trend_data": trend_data,
+            "selected_referral": referral_filter,
+            "period": period,
+            "user_type": user_type
+        }), 200
+
+    except Exception as e:
+        print("❌ Admin dashboard fetch error:", e)
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+# ================================================================
+#  🗂️  Admin Feedback Management Routes
+# ================================================================
+
+@admin_bp.route("/feedbacks", methods=["GET"])
+def get_all_feedbacks():
+    """Fetch all feedbacks from MongoDB"""
+    try:
+        db = current_app.db
+        if db is None:
+            return jsonify({"error": "Database connection failed"}), 500
+
+        feedbacks_col = db["feedbacks"]
+        all_feedbacks = list(feedbacks_col.find({}, {"_id": 1, "name": 1, "email": 1, "rating": 1, "message": 1, "createdAt": 1}))
+
+        # Convert ObjectId to string for frontend
+        for fb in all_feedbacks:
+            fb["_id"] = str(fb["_id"])
+            if "createdAt" in fb and fb["createdAt"]:
+                fb["createdAt"] = fb["createdAt"].strftime("%d-%m-%Y %H:%M")
+
+        return jsonify({"feedbacks": all_feedbacks}), 200
+    except Exception as e:
+        print("❌ Error fetching feedbacks:", e)
+        return jsonify({"error": str(e)}), 500
+
+
+@admin_bp.route("/feedbacks/<feedback_id>", methods=["DELETE"])
+def delete_feedback(feedback_id):
+    """Delete a specific feedback by ID"""
+    try:
+        db = current_app.db
+        if db is None:
+            return jsonify({"error": "Database connection failed"}), 500
+
+        feedbacks_col = db["feedbacks"]
+        result = feedbacks_col.delete_one({"_id": ObjectId(feedback_id)})
+
+        if result.deleted_count == 0:
+            return jsonify({"message": "Feedback not found"}), 404
+
+        return jsonify({"message": "Feedback deleted successfully"}), 200
+    except Exception as e:
+        print("❌ Error deleting feedback:", e)
+        return jsonify({"error": str(e)}), 500
+
+
+
+# ================================================================
+#  📩 Admin Contact Messages Management
+# ================================================================
+from bson import ObjectId
+
+@admin_bp.route("/contacts", methods=["GET"])
+def get_all_contacts():
+    """Fetch all contact messages"""
+    try:
+        db = current_app.db
+        if db is None:
+            return jsonify({"error": "Database connection failed"}), 500
+
+        contact_col = db["contact_messages"]
+        all_contacts = list(contact_col.find({}, {
+            "_id": 1,
+            "name": 1,
+            "email": 1,
+            "subject": 1,
+            "message": 1,
+            "createdAt": 1
+        }))
+
+        for c in all_contacts:
+            c["_id"] = str(c["_id"])
+            if "createdAt" in c and c["createdAt"]:
+                c["createdAt"] = c["createdAt"].strftime("%d-%m-%Y %H:%M")
+
+        return jsonify({"contacts": all_contacts}), 200
+    except Exception as e:
+        print("❌ Error fetching contacts:", e)
+        return jsonify({"error": str(e)}), 500
+
+
+@admin_bp.route("/contacts/<contact_id>", methods=["DELETE"])
+def delete_contact(contact_id):
+    """Delete a specific contact message"""
+    try:
+        db = current_app.db
+        if db is None:
+            return jsonify({"error": "Database connection failed"}), 500
+
+        contact_col = db["contact_messages"]
+        result = contact_col.delete_one({"_id": ObjectId(contact_id)})
+
+        if result.deleted_count == 0:
+            return jsonify({"message": "Contact not found"}), 404
+
+        return jsonify({"message": "Contact deleted successfully"}), 200
+    except Exception as e:
+        print("❌ Error deleting contact:", e)
+        return jsonify({"error": str(e)}), 500
+
+
+
+# ================================================================
+# 👁️ SITE VISITORS ANALYTICS
+# ================================================================
+@admin_bp.route("/visitors", methods=["GET"])
+def get_visitors_analytics():
+    """
+    Returns analytics about user activity (daily time usage, visitors, etc.)
+    Requires collections:
+      - user_activity  (tracks per-day total_minutes)
+      - users          (basic user info)
+    """
+    try:
+        db = current_app.db
+        if db is None:
+            return jsonify({"error": "Database connection failed"}), 500
+
+        users_col = db["users"]
+        activity_col = db["user_activity"]
+
+        today = datetime.utcnow().strftime("%Y-%m-%d")
+
+        # 1️⃣ Total visitors (unique users who used app at least once)
+        total_visitors = len(list(activity_col.distinct("user_id")))
+
+        # 2️⃣ Today's visitors (unique users active today)
+        today_visitors = len(list(activity_col.find({"date": today})))
+
+        # 3️⃣ Total time spent today (sum of total_minutes)
+        total_time_today = 0
+        pipeline = [
+            {"$match": {"date": today}},
+            {"$group": {"_id": None, "total": {"$sum": "$total_minutes"}}}
+        ]
+        result = list(activity_col.aggregate(pipeline))
+        if result:
+            total_time_today = round(result[0]["total"], 2)
+
+        # 4️⃣ Referral-based stats (count of users by referral)
+        referral_stats = {}
+        for user in users_col.find({}, {"referred_by": 1}):
+            ref = user.get("referred_by", "Unknown") or "Unknown"
+            referral_stats[ref] = referral_stats.get(ref, 0) + 1
+
+        # 5️⃣ Detailed visitors table (today’s logs)
+        visitors = []
+        today_logs = activity_col.find({"date": today}).sort("updated_at", -1)
+        for log in today_logs:
+            user = users_col.find_one({"_id": log["user_id"]}, {"first_name": 1, "last_name": 1, "email": 1, "referred_by": 1})
+            if not user:
+                continue
+
+            visitors.append({
+                "_id": str(log["_id"]),
+                "name": f"{user.get('first_name', '')} {user.get('last_name', '')}".strip() or "Guest",
+                "email": user.get("email", "N/A"),
+                "referral": user.get("referred_by", "N/A"),
+                "visit_start": log.get("created_at", "").strftime("%H:%M") if log.get("created_at") else "N/A",
+                "visit_end": log.get("updated_at", "").strftime("%H:%M") if log.get("updated_at") else "N/A",
+                "duration_minutes": round(log.get("total_minutes", 0), 2)
+            })
+
+        # ✅ Final response
+        return jsonify({
+            "total_visitors": total_visitors,
+            "today_visitors": today_visitors,
+            "today_time_spent": total_time_today,
+            "referral_stats": referral_stats,
+            "visitors": visitors
+        }), 200
+
+    except Exception as e:
+        print("❌ Error fetching visitors:", e)
+        return jsonify({"error": str(e)}), 500
