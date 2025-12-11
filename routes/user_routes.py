@@ -17,7 +17,7 @@ def allowed_file(filename):
 
 # ---------------------- GET PROFILE ----------------------
 @user_bp.route("/profile", methods=["GET", "OPTIONS"])
-@cross_origin(origins=["http://localhost:3000"], supports_credentials=True)
+@cross_origin(origins=["https://viadocs.in"], supports_credentials=True)
 @jwt_required()
 def get_profile():
     """Fetch user profile details"""
@@ -54,7 +54,7 @@ def get_profile():
 
 # ---------------------- UPDATE PROFILE ----------------------
 @user_bp.route("/profile", methods=["PUT", "OPTIONS"])
-@cross_origin(origins=["http://localhost:3000"], supports_credentials=True)
+@cross_origin(origins=["https://viadocs.in"], supports_credentials=True)
 @jwt_required()
 def update_profile():
     """Update profile fields (name, DOB, etc.)"""
@@ -90,7 +90,7 @@ def update_profile():
 
 # ---------------------- UPLOAD PROFILE IMAGE (Save in MongoDB) ----------------------
 @user_bp.route("/profile/upload", methods=["PUT", "OPTIONS"])
-@cross_origin(origins=["http://localhost:3000"], supports_credentials=True)
+@cross_origin(origins=["https://viadocs.in"], supports_credentials=True)
 @jwt_required()
 def upload_profile_image():
     """
@@ -141,7 +141,7 @@ def upload_profile_image():
 
 # ---------------------- SET USER ROLE ----------------------
 @user_bp.route("/profile/role", methods=["POST", "OPTIONS"])
-@cross_origin(origins=["http://localhost:3000"], supports_credentials=True)
+@cross_origin(origins=["https://viadocs.in"], supports_credentials=True)
 @jwt_required()
 def set_role():
     """Save user type (Student / Employee)"""

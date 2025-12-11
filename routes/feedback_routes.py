@@ -15,7 +15,7 @@ load_dotenv()
 feedback_bp = Blueprint("feedback_bp", __name__)
 
 MONGODB_URI = os.getenv("MONGODB_URI")
-FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")
+FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "https://viadocs.in")
 
 # ✅ MongoDB Connection
 client = MongoClient(MONGODB_URI)

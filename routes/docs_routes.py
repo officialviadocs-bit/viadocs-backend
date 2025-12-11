@@ -24,7 +24,7 @@ def allowed_file(filename):
 # CHECK DOCUMENT NAME
 # ----------------------------------------------------------
 @docs_bp.route("/check-name", methods=["POST", "OPTIONS"])
-@cross_origin(origins=["http://localhost:3000"], supports_credentials=True)
+@cross_origin(origins=["https://viadocs.in"], supports_credentials=True)
 @jwt_required()
 def check_doc_name():
     try:
@@ -47,7 +47,7 @@ def check_doc_name():
 # CREATE DOCUMENT
 # ----------------------------------------------------------
 @docs_bp.route("/my-docs", methods=["POST", "OPTIONS"])
-@cross_origin(origins=["http://localhost:3000"], supports_credentials=True)
+@cross_origin(origins=["https://viadocs.in"], supports_credentials=True)
 @jwt_required()
 def create_doc():
     try:
@@ -85,7 +85,7 @@ def create_doc():
 # GET ALL USER DOCUMENTS
 # ----------------------------------------------------------
 @docs_bp.route("/my-docs", methods=["GET", "OPTIONS"])
-@cross_origin(origins=["http://localhost:3000"], supports_credentials=True)
+@cross_origin(origins=["https://viadocs.in"], supports_credentials=True)
 @jwt_required()
 def get_user_docs():
     try:
@@ -108,7 +108,7 @@ def get_user_docs():
 # GET SINGLE DOCUMENT
 # ----------------------------------------------------------
 @docs_bp.route("/my-docs/<doc_id>", methods=["GET", "OPTIONS"])
-@cross_origin(origins=["http://localhost:3000"], supports_credentials=True)
+@cross_origin(origins=["https://viadocs.in"], supports_credentials=True)
 @jwt_required()
 def get_single_doc(doc_id):
     try:
@@ -130,7 +130,7 @@ def get_single_doc(doc_id):
 # UPDATE DOCUMENT
 # ----------------------------------------------------------
 @docs_bp.route("/my-docs/<doc_id>", methods=["PUT", "OPTIONS"])
-@cross_origin(origins=["http://localhost:3000"], supports_credentials=True)
+@cross_origin(origins=["https://viadocs.in"], supports_credentials=True)
 @jwt_required()
 def update_doc(doc_id):
     try:
@@ -162,7 +162,7 @@ def update_doc(doc_id):
 # DELETE DOCUMENT
 # ----------------------------------------------------------
 @docs_bp.route("/my-docs/<doc_id>", methods=["DELETE", "OPTIONS"])
-@cross_origin(origins=["http://localhost:3000"], supports_credentials=True)
+@cross_origin(origins=["https://viadocs.in"], supports_credentials=True)
 @jwt_required()
 def delete_doc(doc_id):
     try:
@@ -183,7 +183,7 @@ def delete_doc(doc_id):
 # TOGGLE FAVORITE
 # ----------------------------------------------------------
 @docs_bp.route("/my-docs/<doc_id>/favorite", methods=["PATCH", "OPTIONS"])
-@cross_origin(origins=["http://localhost:3000"], supports_credentials=True)
+@cross_origin(origins=["https://viadocs.in"], supports_credentials=True)
 @jwt_required()
 def toggle_favorite(doc_id):
     try:
@@ -210,7 +210,7 @@ def toggle_favorite(doc_id):
 # ✅ UPLOAD DOCUMENT IMAGE — Save to MongoDB Atlas
 # ----------------------------------------------------------
 @docs_bp.route("/upload-image", methods=["POST", "OPTIONS"])
-@cross_origin(origins=["http://localhost:3000"], supports_credentials=True)
+@cross_origin(origins=["https://viadocs.in"], supports_credentials=True)
 @jwt_required()
 def upload_image():
     """
@@ -260,7 +260,7 @@ def upload_image():
 # HOME SUMMARY
 # ----------------------------------------------------------
 @docs_bp.route("/summary", methods=["GET", "OPTIONS"])
-@cross_origin(origins=["http://localhost:3000"], supports_credentials=True)
+@cross_origin(origins=["https://viadocs.in"], supports_credentials=True)
 @jwt_required()
 def home_summary():
     try:
@@ -303,7 +303,7 @@ def home_summary():
 # AUTH REGISTER
 # ----------------------------------------------------------
 @docs_bp.route("/auth/register", methods=["POST", "OPTIONS"])
-@cross_origin(origins=["http://localhost:3000"], supports_credentials=True)
+@cross_origin(origins=["https://viadocs.in"], supports_credentials=True)
 def register():
     try:
         db = current_app.db
